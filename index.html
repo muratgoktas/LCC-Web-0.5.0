@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCC Web SDK Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #loadingScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: #4cc9f0;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #loadingText {
+            color: white;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        #progressBar {
+            width: 300px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        #progressFill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4361ee, #4cc9f0);
+            transition: width 0.3s ease;
+        }
+
+        #loadingPercentage {
+            color: #4cc9f0;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        #errorMessage {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: #ff6b6b;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 500px;
+            z-index: 1001;
+            border: 1px solid #ff6b6b;
+        }
+
+        #errorMessage h2 {
+            margin-bottom: 15px;
+            color: #ff6b6b;
+        }
+
+        #errorMessage ul {
+            text-align: left;
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+
+        #errorMessage li {
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        select,
+        button {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:hover,
+        button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #4cc9f0;
+        }
+
+        select:focus,
+        button:focus {
+            outline: none;
+            border-color: #4cc9f0;
+            box-shadow: 0 0 0 2px rgba(76, 201, 240, 0.3);
+        }
+
+        button {
+            background: linear-gradient(135deg, #4361ee, #4cc9f0);
+            border: none;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #3a56d4, #3ab4d9);
+            transform: translateY(-1px);
+        }
+
+        #stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        #fps {
+            color: #4cc9f0;
+            font-weight: bold;
+        }
+
+        #infoPanel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            max-width: 300px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        #infoPanel h3 {
+            color: #4cc9f0;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        #infoPanel p {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+
+        #closeInfo {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            float: right;
+        }
+
+        #closeInfo:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            #controls,
+            #infoPanel {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+            
+            #stats {
+                bottom: 10px;
+                left: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <div id="loadingScreen">
+            <div class="loader"></div>
+            <div id="loadingText">Loading LCC Model...</div>
+            <div id="progressBar">
+                <div id="progressFill"></div>
+            </div>
+            <div id="loadingPercentage">0%</div>
+        </div>
+
+        <div id="errorMessage">
+            <h2>WebGL Error</h2>
+            <p>Unable to initialize WebGL. Please try the following:</p>
+            <ul>
+                <li>Enable WebGL in your browser settings</li>
+                <li>Update your graphics drivers</li>
+                <li>Try a different browser (Chrome, Firefox, Edge)</li>
+                <li>Check if WebGL is supported: <a href="https://get.webgl.org/" target="_blank" style="color: #4cc9f0;">get.webgl.org</a></li>
+            </ul>
+            <button onclick="location.reload()">Retry</button>
+        </div>
+
+        <div id="infoPanel">
+            <button id="closeInfo">×</button>
+            <h3>LCC Viewer Controls</h3>
+            <p>• <strong>Left Click + Drag:</strong> Orbit camera</p>
+            <p>• <strong>Right Click + Drag:</strong> Pan camera</p>
+            <p>• <strong>Mouse Wheel:</strong> Zoom in/out</p>
+            <p>• <strong>WASD:</strong> Move in first person mode</p>
+        </div>
+
+        <div id="controls">
+            <div class="control-group">
+                <label>Camera Mode</label>
+                <select id="cameraMode">
+                    <option value="orbit">Orbit Camera</option>
+                    <option value="firstperson">First Person</option>
+                    <option value="free">Free Camera</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Quality</label>
+                <select id="quality">
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Environment</label>
+                <select id="environment">
+                    <option value="default">Default</option>
+                    <option value="studio">Studio</option>
+                    <option value="sunset">Sunset</option>
+                    <option value="night">Night</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <button id="resetView">Reset View</button>
+            </div>
+            <div class="control-group">
+                <button id="screenshot">Take Screenshot</button>
+            </div>
+        </div>
+
+        <div id="stats">
+            FPS: <span id="fps">0</span> | Triangles: <span id="triangles">0</span>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { FirstPersonControls } from 'three/addons/controls/FirstPersonControls.js';
+
+        class LCCViewer {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.controls = null;
+                this.lccObject = null;
+                this.currentCameraMode = 'orbit';
+                this.clock = new THREE.Clock();
+                this.fpsCounter = 0;
+                this.lastTime = performance.now();
+                
+                this.init();
+            }
+
+            async init() {
+                try {
+                    // Check WebGL support
+                    if (!this.checkWebGLSupport()) {
+                        this.showError('WebGL is not supported in your browser. Please enable WebGL or try a different browser.');
+                        return;
+                    }
+
+                    // Initialize Three.js
+                    this.initThreeJS();
+                    
+                    // Setup event listeners
+                    this.setupEventListeners();
+                    
+                    // Load LCC model
+                    await this.loadLCCModel();
+                    
+                    // Hide loading screen
+                    this.hideLoadingScreen();
+                    
+                    // Start animation loop
+                    this.animate();
+                    
+                } catch (error) {
+                    console.error('Failed to initialize LCC Viewer:', error);
+                    this.showError('Failed to load the model. Please check the console for details.');
+                }
+            }
+
+            checkWebGLSupport() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    return !!gl;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            initThreeJS() {
+                // Create scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x111111);
+                
+                // Create camera
+                this.camera = new THREE.PerspectiveCamera(
+                    60,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    10000
+                );
+                this.camera.position.set(10, 10, 10);
+                
+                // Create renderer with fallback options for older GPUs
+                try {
+                    this.renderer = new THREE.WebGLRenderer({
+                        antialias: true,
+                        powerPreference: 'default',
+                        failIfMajorPerformanceCaveat: false,
+                        alpha: false,
+                        stencil: false,
+                        depth: true,
+                        preserveDrawingBuffer: false
+                    });
+                } catch (webglError) {
+                    console.warn('WebGLRenderer failed:', webglError);
+                    throw new Error('WebGL context could not be created');
+                }
+                
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.0;
+                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+                
+                // Add renderer to DOM
+                document.getElementById('container').appendChild(this.renderer.domElement);
+                
+                // Add lights
+                this.addLights();
+                
+                // Setup orbit controls initially
+                this.setupOrbitControls();
+            }
+
+            addLights() {
+                // Ambient light
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                this.scene.add(ambientLight);
+                
+                // Directional light (sun)
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+                directionalLight.position.set(50, 100, 50);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                directionalLight.shadow.camera.near = 0.5;
+                directionalLight.shadow.camera.far = 500;
+                directionalLight.shadow.camera.left = -100;
+                directionalLight.shadow.camera.right = 100;
+                directionalLight.shadow.camera.top = 100;
+                directionalLight.shadow.camera.bottom = -100;
+                this.scene.add(directionalLight);
+                
+                // Hemisphere light for natural outdoor lighting
+                const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x8B4513, 0.3);
+                this.scene.add(hemisphereLight);
+            }
+
+            setupOrbitControls() {
+                if (this.controls) {
+                    this.controls.dispose();
+                }
+                
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                this.controls.screenSpacePanning = false;
+                this.controls.minDistance = 1;
+                this.controls.maxDistance = 500;
+                this.controls.maxPolarAngle = Math.PI;
+                this.controls.target.set(0, 0, 0);
+                this.currentCameraMode = 'orbit';
+            }
+
+            setupFirstPersonControls() {
+                if (this.controls) {
+                    this.controls.dispose();
+                }
+                
+                this.controls = new FirstPersonControls(this.camera, this.renderer.domElement);
+                this.controls.movementSpeed = 5;
+                this.controls.lookSpeed = 0.1;
+                this.controls.lookVertical = true;
+                this.controls.activeLook = true;
+                this.controls.heightSpeed = true;
+                this.controls.heightCoef = 1.0;
+                this.controls.heightMin = 0.0;
+                this.controls.heightMax = 1.0;
+                this.currentCameraMode = 'firstperson';
+            }
+
+            async loadLCCModel() {
+                return new Promise((resolve, reject) => {
+                    // Check if LCCRender is available
+                    if (typeof LCCRender === 'undefined') {
+                        reject(new Error('LCCRender SDK not loaded. Make sure lcc-0.5.5.js is included.'));
+                        return;
+                    }
+                    
+                    // Update loading progress
+                    const updateProgress = (percent) => {
+                        const progressFill = document.getElementById('progressFill');
+                        const loadingPercentage = document.getElementById('loadingPercentage');
+                        const progress = Math.round(percent * 100);
+                        progressFill.style.width = `${progress}%`;
+                        loadingPercentage.textContent = `${progress}%`;
+                    };
+                    
+                    // Path to your LCC model - update this to your actual model path
+                    const modelPath = '/assets/meta.lcc'; // Change this to your model path
+                    
+                    try {
+                        // Load LCC model
+                        this.lccObject = LCCRender.load({
+                            camera: this.camera,
+                            scene: this.scene,
+                            dataPath: modelPath,
+                            renderLib: THREE,
+                            canvas: this.renderer.domElement,
+                            renderer: this.renderer,
+                            useEnv: true,
+                            useIndexDB: true,
+                            useLoadingEffect: true,
+                            modelMatrix: new THREE.Matrix4(),
+                            appKey: null // Add your app key here if required
+                        }, 
+                        // onLoad callback
+                        (mesh) => {
+                            console.log('LCC model loaded successfully:', mesh);
+                            
+                            // Center the model
+                            this.centerModel();
+                            
+                            // Update stats
+                            this.updateStats();
+                            
+                            resolve(mesh);
+                        },
+                        // onProgress callback
+                        (percent) => {
+                            updateProgress(percent);
+                        },
+                        // onError callback
+                        (error) => {
+                            console.error('Failed to load LCC model:', error);
+                            reject(error);
+                        });
+                        
+                        // Store reference for debugging
+                        window.lccObject = this.lccObject;
+                        
+                    } catch (error) {
+                        console.error('Error loading LCC model:', error);
+                        reject(error);
+                    }
+                });
+            }
+
+            centerModel() {
+                if (!this.lccObject) return;
+                
+                // Create a bounding box to center the model
+                const box = new THREE.Box3().setFromObject(this.lccObject);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                
+                // Adjust camera position based on model size
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const cameraDistance = maxDim * 1.5;
+                
+                if (this.currentCameraMode === 'orbit') {
+                    this.camera.position.copy(center);
+                    this.camera.position.x += cameraDistance;
+                    this.camera.position.y += cameraDistance * 0.5;
+                    this.camera.position.z += cameraDistance;
+                    
+                    if (this.controls) {
+                        this.controls.target.copy(center);
+                        this.controls.update();
+                    }
+                }
+                
+                this.camera.lookAt(center);
+            }
+
+            setupEventListeners() {
+                // Window resize
+                window.addEventListener('resize', () => this.onWindowResize());
+                
+                // Camera mode change
+                document.getElementById('cameraMode').addEventListener('change', (e) => {
+                    this.changeCameraMode(e.target.value);
+                });
+                
+                // Quality change
+                document.getElementById('quality').addEventListener('change', (e) => {
+                    this.changeQuality(e.target.value);
+                });
+                
+                // Environment change
+                document.getElementById('environment').addEventListener('change', (e) => {
+                    this.changeEnvironment(e.target.value);
+                });
+                
+                // Reset view
+                document.getElementById('resetView').addEventListener('click', () => {
+                    this.resetView();
+                });
+                
+                // Screenshot
+                document.getElementById('screenshot').addEventListener('click', () => {
+                    this.takeScreenshot();
+                });
+                
+                // Close info panel
+                document.getElementById('closeInfo').addEventListener('click', () => {
+                    document.getElementById('infoPanel').style.display = 'none';
+                });
+            }
+
+            changeCameraMode(mode) {
+                switch (mode) {
+                    case 'orbit':
+                        this.setupOrbitControls();
+                        break;
+                    case 'firstperson':
+                        this.setupFirstPersonControls();
+                        break;
+                    case 'free':
+                        // Free camera mode - no controls
+                        if (this.controls) {
+                            this.controls.enabled = false;
+                        }
+                        this.currentCameraMode = 'free';
+                        break;
+                }
+            }
+
+            changeQuality(quality) {
+                switch (quality) {
+                    case 'high':
+                        this.renderer.setPixelRatio(window.devicePixelRatio);
+                        break;
+                    case 'medium':
+                        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+                        break;
+                    case 'low':
+                        this.renderer.setPixelRatio(1);
+                        break;
+                }
+            }
+
+            changeEnvironment(env) {
+                // This would change the environment map/skybox
+                // Implementation depends on your LCC SDK capabilities
+                console.log('Changing environment to:', env);
+            }
+
+            resetView() {
+                if (this.currentCameraMode === 'orbit' && this.controls) {
+                    this.controls.reset();
+                } else {
+                    this.camera.position.set(10, 10, 10);
+                    this.camera.lookAt(0, 0, 0);
+                }
+            }
+
+            takeScreenshot() {
+                // Render the scene to a data URL
+                this.renderer.render(this.scene, this.camera);
+                const dataURL = this.renderer.domElement.toDataURL('image/png');
+                
+                // Create a temporary link to download the image
+                const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = `lcc-screenshot-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Show notification
+                this.showNotification('Screenshot saved!');
+            }
+
+            showNotification(message) {
+                // Create notification element
+                const notification = document.createElement('div');
+                notification.textContent = message;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    z-index: 1000;
+                    font-family: inherit;
+                    animation: fadeInOut 2s ease-in-out;
+                `;
+                
+                // Add animation styles
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes fadeInOut {
+                        0% { opacity: 0; transform: translateY(-20px); }
+                        10% { opacity: 1; transform: translateY(0); }
+                        90% { opacity: 1; transform: translateY(0); }
+                        100% { opacity: 0; transform: translateY(-20px); }
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                document.body.appendChild(notification);
+                
+                // Remove notification after animation
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                    document.head.removeChild(style);
+                }, 2000);
+            }
+
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                
+                if (this.controls && typeof this.controls.handleResize === 'function') {
+                    this.controls.handleResize();
+                }
+            }
+
+            hideLoadingScreen() {
+                const loadingScreen = document.getElementById('loadingScreen');
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 500);
+            }
+
+            showError(message) {
+                document.getElementById('loadingScreen').style.display = 'none';
+                const errorDiv = document.getElementById('errorMessage');
+                errorDiv.querySelector('p').textContent = message;
+                errorDiv.style.display = 'block';
+            }
+
+            updateStats() {
+                // Count triangles in scene
+                let triangleCount = 0;
+                this.scene.traverse((object) => {
+                    if (object.isMesh) {
+                        const geometry = object.geometry;
+                        if (geometry.index) {
+                            triangleCount += geometry.index.count / 3;
+                        } else {
+                            triangleCount += geometry.attributes.position.count / 3;
+                        }
+                    }
+                });
+                
+                document.getElementById('triangles').textContent = triangleCount.toLocaleString();
+            }
+
+            updateFPS() {
+                const now = performance.now();
+                this.fpsCounter++;
+                
+                if (now >= this.lastTime + 1000) {
+                    document.getElementById('fps').textContent = this.fpsCounter;
+                    this.fpsCounter = 0;
+                    this.lastTime = now;
+                }
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                const delta = this.clock.getDelta();
+                
+                // Update controls if available
+                if (this.controls && this.controls.enabled) {
+                    if (this.currentCameraMode === 'firstperson') {
+                        this.controls.update(delta);
+                    } else if (this.currentCameraMode === 'orbit') {
+                        this.controls.update();
+                    }
+                }
+                
+                // Update LCC renderer if available
+                if (typeof LCCRender !== 'undefined' && LCCRender.update) {
+                    LCCRender.update();
+                }
+                
+                // Update FPS counter
+                this.updateFPS();
+                
+                // Render scene
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Initialize viewer when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            window.viewer = new LCCViewer();
+        });
+
+        // Add LCC SDK script dynamically (adjust the path as needed)
+        const lccScript = document.createElement('script');
+        lccScript.src = '../sdk/lcc-0.5.5.js'; // Update this path to match your LCC SDK location
+        lccScript.onload = () => console.log('LCC SDK loaded successfully');
+        lccScript.onerror = () => console.error('Failed to load LCC SDK');
+        document.head.appendChild(lccScript);
+    </script>
+</body>
+</html>
