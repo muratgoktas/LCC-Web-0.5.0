@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCC ThreeJS Demo</title>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./lib/three/three.module.js",
+                "three/addons/": "./lib/three/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { FirstPersonControls } from './lib/three/FirstPersonControls.js';
+        // use es module import
+        import { LCCRender } from './sdk/lcc-0.5.0.js'
+
+        // use umd import
+        // const LCCRender = LCC.LCCRender;
+
+        const scene = new THREE.Scene();
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        renderer.setClearColor(0xffffff);
+        document.body.appendChild(renderer.domElement);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 1, 1000);
+        camera.up.set(0, 0, 1);
+        camera.position.set(0, -5, 2); // Set init camera position
+
+        const clock = new THREE.Clock();
+        
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set( 0, 0, 0 );
+        controls.update(); 
+        controls.enabled = false
+
+
+        const firstPersonControl = new FirstPersonControls(camera, renderer.domElement)
+        firstPersonControl.enabled = true // true
+        firstPersonControl.movementSpeed = 5
+        firstPersonControl.lookAt(new THREE.Vector3(0, 0, 0))
+
+        // Loading lcc object
+        const lccObj = LCCRender.load({
+            camera: camera,
+            scene: scene,
+            dataPath: 'http://localhost:5500/data/LEGOPanda', // Lcc data path
+            renderLib: THREE,
+            canvas: renderer.domElement,
+            renderer: renderer
+        }, (mesh) => {
+            // 'mesh' is type of THREE.Mesh
+            console.log('Lcc object Loaded:  ', mesh);
+        }, (percent) => {
+            console.log('Lcc object loading: ' + (percent * 100).toFixed(1) + '%' );
+        }, () => {
+            console.log("Lcc object loading failure");
+        });
+
+        window.obj = lccObj
+
+        function render() {
+            if(firstPersonControl?.enabled){
+                firstPersonControl.update(clock.getDelta())
+            }
+            LCCRender.update();
+            renderer.render(scene, camera);
+        }
+
+        function animate() {
+            renderer.setAnimationLoop(() => {
+                render();
+            });
+        }
+
+        animate();
+    </script>
+</body>
+</html>
